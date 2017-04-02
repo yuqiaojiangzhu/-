@@ -1,0 +1,278 @@
+备注：转载从：http://blog.csdn.net/q547550831/article/details/53325180
+
+版权声明：如需转载，请联系本人获取许可且必须注明出处，详见联系方式。
+ContextMap详解
+基本介绍
+     ContextMap是OGNL的上下文对象，其是以键值对为形式存在的，key是String value是Object。其封装的数据如下：
+
+ 
+
+ContextMap是在ActionInvocation默认实现类DefaultActionInvocation中创建的
+
+ 
+
+ 
+
+
+使用哪个类来操作该对象
+           ActionContext
+           ContentMap是一个Map，封装着一次请求所需的所有数据。key是一个字符串，value是一个Object对象。直接操作它有些不方便，所以框架为我们提供了一个工具类，就是ActionContext。
+
+ActionContext
+     何时创建
+          核心控制器的doFilter方法，在判断访问URL后缀符合条件，准备进入Struts2核心内部时，创建ActionContext对象。该对象可以快速的操作ContextMap。
+
+Struts2核心过滤器StrutsPrepareAndExecuteFilter中的doFilter方法
+
+ 
+
+ 
+
+PrepareOperations类
+
+ 
+
+ 
+
+
+     如何保证的每个线程访问的都是自己的ActionContext对象       
+          每个线程都有自己的一个ActionContext,为了保证每个线程都能获取到自己的ActionContext，它会把ActionContext绑定到当前线程上。
+
+ 
+
+ 
+
+结合PrepareOperation的源码，和以下ActionContext的源码，可以看出ActionContext为什么是线程安全的。
+[java] view plain copy
+ 
+在CODE上查看代码片派生到我的代码片
+
+    public class ActionContext implements Serializable {  
+        static ThreadLocal<ActionContext> actionContext = new ThreadLocal<ActionContext>();  
+        private Map<String, Object> context;  
+        public ActionContext(Map<String, Object> context) {  
+            this.context = context;  
+        }  
+      
+        public static void setContext(ActionContext context) {  
+            actionContext.set(context);  
+        }  
+      
+        public static ActionContext getContext() {  
+            return actionContext.get();  
+        }  
+
+
+ActionContext是一个工具类，是struts2框架让我们能够快速操作ContextMap的工具类。里面提供了一些访问方法。
+
+ActionContext类常用访问方法
+方法声明
+	
+功能描述
+void put(String key, Object value)
+	
+将 key-value键值对放入ActionContext 中，模拟Servlet API中的HttpServletRequest的setAttribute()方法。也就是将值存入ContextMap中。
+Object get(String key)
+	
+通过参数key来查找当前ActionContext中的值，也就是查找ContextMap中的值。
+Map<String, Object> getApplication()
+	
+返回一个Application级的Map对象。
+static ActionContext getContext()
+	
+获取当前线程的ActionContext对象。
+Map<String, Object> getParameters()
+	
+返回一个包含所有HttpServletRequest参数信息的Map对象。
+Map<String, Object> getSession()
+	
+返回一个Map类型的HttpSession对象。
+void setApplication(Map<String, Object> application)
+	
+设置Application上下文。
+void setSession(Map<String, Object> session)
+	
+设置一个Map类型的Session值 。
+void setLocale(Locale locale)
+	
+设置当前action
+Locale getLocale()
+	
+获取当前action
+ValueStack getValueStack()
+	
+获取ContextMap中的值栈对象
+void setValueStack(ValueStack stack)
+	
+设置ContextMap中的值栈对象
+
+可以看以下源码，了解ActionContext是怎么设置值，获取值的。由此也能看出ActionContext仅仅只是一个ContextMap的工具类而已。
+[java] view plain copy
+ 
+在CODE上查看代码片派生到我的代码片
+
+    public class ActionContext implements Serializable {  
+        static ThreadLocal<ActionContext> actionContext = new ThreadLocal<ActionContext>();  
+        private Map<String, Object> context;  
+        public static final String VALUE_STACK = ValueStack.VALUE_STACK;  
+        public static final String SESSION = "com.opensymphony.xwork2.ActionContext.session";  
+        public static final String APPLICATION = "com.opensymphony.xwork2.ActionContext.application";  
+        public static final String PARAMETERS = "com.opensymphony.xwork2.ActionContext.parameters";  
+        public static final String LOCALE = "com.opensymphony.xwork2.ActionContext.locale";  
+        public void setApplication(Map<String, Object> application) {  
+            put(APPLICATION, application);  
+        }  
+        public Map<String, Object> getApplication() {  
+            return (Map<String, Object>) get(APPLICATION);  
+        }  
+        public static void setContext(ActionContext context) {  
+            actionContext.set(context);  
+        }  
+        public static ActionContext getContext() {  
+            return actionContext.get();  
+        }  
+        public void setLocale(Locale locale) {  
+            put(LOCALE, locale);  
+        }  
+        public Locale getLocale() {  
+            Locale locale = (Locale) get(LOCALE);  
+            if (locale == null) {  
+                locale = Locale.getDefault();  
+                setLocale(locale);  
+            }  
+            return locale;  
+        }  
+        public void setParameters(Map<String, Object> parameters) {  
+            put(PARAMETERS, parameters);  
+        }  
+        public Map<String, Object> getParameters() {  
+            return (Map<String, Object>) get(PARAMETERS);  
+        }  
+        public void setSession(Map<String, Object> session) {  
+            put(SESSION, session);  
+        }  
+        public Map<String, Object> getSession() {  
+            return (Map<String, Object>) get(SESSION);  
+        }  
+        public void setValueStack(ValueStack stack) {  
+            put(VALUE_STACK, stack);  
+        }  
+        public ValueStack getValueStack() {  
+            return (ValueStack) get(VALUE_STACK);  
+        }  
+        public Object get(String key) {  
+            return context.get(key);  
+        }  
+        public void put(String key, Object value) {  
+            context.put(key, value);  
+        }  
+    }  
+
+
+案例
+
+[java] view plain copy
+ 
+在CODE上查看代码片派生到我的代码片
+
+    package com.pc.web.action;  
+      
+    import java.util.Map;  
+      
+    import javax.servlet.ServletContext;  
+    import javax.servlet.http.HttpSession;  
+      
+    import org.apache.struts2.ServletActionContext;  
+      
+    import com.opensymphony.xwork2.ActionContext;  
+    import com.opensymphony.xwork2.ActionSupport;  
+      
+    /** 
+     * ContextMap中的 
+     *         Map部分的操作 
+     *             大Map 
+     *             小Map 
+     * @author Switch 
+     * 操作ContextMap用它的工具类：ActionContext 
+     */  
+    public class TestAction extends ActionSupport {  
+      
+        /** 
+         * Map部分的操作 
+         *      ContextMap它是一个Map，可以用于存放数据。它的key是String类型。value是Object类型。 
+         *      1、存入ContextMap中数据。 
+         *             key=contextMap value=hello context map 
+         *      2、存入Session小Map中数据 
+         *             key=sessionMap value=hello session map 
+         *             要求用两种方式: 
+         *                 使用Map操作的方式 
+         *                 使用HttpSession对象操作的方式 
+         *     3、存入application小Map中数据 
+         *            key=applicationMap value=hello application map 
+         * @return 
+         * 注意： 
+         *      获取小Map可以使用两种方式： 
+         *         一种是长名称，一种是短名称。 
+         *         一般情况下，短名称是给程序员用的。 
+         *                   长名称是给框架自己用的。 
+         */  
+        public String test1(){  
+            //1.获取ActionContext  
+            ActionContext context = ActionContext.getContext();//从当前线程上获取  
+            //2.存入数据  
+            context.put("contextMap", "hello context map");  
+      
+            //3.获取Session小Map  
+            //第一种方式：  
+            //(Map<String, Object>) context.get("com.opensymphony.xwork2.ActionContext.session");  
+            Map<String,Object> sessionMap = context.getSession();  
+            sessionMap.put("sessionMap2", "hello session map2");  
+            //第二种方式：  
+            HttpSession session = ServletActionContext.getRequest().getSession();  
+            session.setAttribute("sessionMap3", "hello session map3");  
+      
+            //4.获取application小Map  
+            Map<String,Object> applicationMap = context.getApplication();  
+            applicationMap.put("applicationMap", "hello application map");  
+      
+            ServletContext application = ServletActionContext.getServletContext();  
+            application.setAttribute("applicationAttr", "hello application attr");  
+      
+            return SUCCESS;  
+        }  
+    }  
+
+
+[html] view plain copy
+ 
+在CODE上查看代码片派生到我的代码片
+
+    <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>  
+    <%@ taglib uri="/struts-tags" prefix="s" %>  
+    <!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">  
+    <html>  
+    <head>  
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">  
+    <title>Map部分的操作</title>  
+    </head>  
+    <body>  
+    <%--1、使用OGNL表达式获取Map中的数据  
+    需要借助s:property标签  
+    value属性的取值是一个OGNL表达式，在Map部分中获取数据，都是根据key获取value。  
+    根据Key获取value的OGNL表达式写法：  
+            #key  
+    --%>  
+    大Map：<s:property value="#contextMap"/>  
+    <hr/>  
+    取key为session的小Map中数据：  
+        <s:property value="#session.sessionMap2"/><br/>  
+        <s:property value="#session.sessionMap2.length()"/><br/>  
+    取key为application的小Map中数据：  
+        <s:property value="#application.applicationAttr"/>  
+        <s:property value="#application.applicationAttr.toUpperCase()"/>  
+      
+      
+    <%--s:debug标签：它可以查看ContextMap中的数据 --%>  
+    <s:debug></s:debug>  
+    </body>  
+    </html>  
