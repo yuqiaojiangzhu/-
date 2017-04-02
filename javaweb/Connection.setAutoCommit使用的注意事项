@@ -1,0 +1,71 @@
+转自xiayimiaokuaile的专栏
+
+setAutoCommit总的来说就是保持数据的完整性，一个系统的更新操作可能要涉及多张表，需多个SQL语句进行操作
+
+循环里连续的进行插入操作，如果你在开始时设置了：conn.setAutoCommit(false);
+最后才进行conn.commit(),这样你即使插入的时候报错，修改的内容也不会提交到数据库，
+而如果你没有手动的进行setAutoCommit(false);
+出错时就会造成，前几条插入，后几条没有
+会形成脏数据~~
+
+setAutoCommit(false)的误用
+（设定setAutoCommit(false)没有在catch中进行Connection的rollBack操作，操作的表就会被锁住，造成数据库死锁）：
+误用Connection.setAutoCommit导致的数据库死锁问题。
+系统在发布到用户的的服务器了，运行一段时间偶尔出现某些功能不能正常运行，甚至不能自动恢复，严重导致服务器当机，表现为服务器不响应用户的请求，数据库有大量的锁。在服务器重启后才能恢复正常。今天通遍的查看了一下代码，初步分析了原因，记录了下来，跟大家交流交流。
+先看下面一段有问题的代码：
+ 
+1       Connection con = null;
+2      try{
+3          con = getConnection();
+4          con.setAutoCommit(false);
+           /*
+5          * update USER set name=’winson’ where id=’000001’;
+            */
+6          con.commit();
+7       }finally{
+8          if(con!=null){
+9              try {
+10                 con.close();
+11             } catch (SQLException e) {
+12                 e.printStackTrace();
+13             }
+           }
+       }
+分析：问题就出现在第4行，写代码的人把数据库连接con 设置成非自动提交，但没有在执行出现异常的时候进行回滚。如果在执行第5行的时候出现异常，con既没有提交也没有回滚，表USER就会被锁住(如果oracle数据库就是行锁)，而这个锁却没有机会释放。有人会质疑，在执行con.close()的时候不会释放锁吗？因为如果应用服务器使用了数据库连接池，连接不会被断开。
+附：在oracle上查看锁的方法：select * from v$lock_object或者select * from v$lock.
+JDBC的api文档是这样对setAutoCommit方法解释的：
+Sets the connection's auto-commit mode to enableAutoCommit.
+      Newly created Connection objects are in auto-commit mode by default, which means that individual SQL statements are committed automatically when the statement is completed. To be able to group SQL statements into transactions and commit them or roll them back as a unit, auto-commit must be disabled by calling the method setAutoCommit with false as its argument. When auto-commit is disabled, the user must call either the commit or rollback method explicitly to end a transaction.（一定不能大意哦，如果设置成非自动提交，在最后一定要调用commit或者rollback方法）
+      The commit occurs when the statement completes or the next execute occurs, whichever comes first. In the case of statements returning a ResultSet object, the statement completes when the last row of the result set has been retrieved or the ResultSet object has been closed. In advanced cases, a single statement may return multiple results as well as output parameter values. In this case, the commit may occur when all results and output parameter values have been retrieved, or the commit may occur after each result is retrieved.
+ 
+参考正确的写法应该是：
+        Connection con = null;
+       try{
+           con = getConnection();
+           con.setAutoCommit(false);
+           /*
+            * do what you want here.
+            */
+           con.commit();
+        }catch(Throwable e){
+           if(con!=null){
+               try {
+                   con.rollback();
+               } catch (SQLException e1) {
+                   e1.printStackTrace();
+               }
+           }
+
+throw new RuntimeException(e);
+        }finally{
+           if(con!=null){
+               try {
+                   con.close();
+               } catch (SQLException e) {
+                   e.printStackTrace();
+               }
+           }
+       }
+ 
+这种疏忽很容易出现，但又导致非常严重的运行问题。所以在这里作个提醒，以后在处理外部资源的时候一定要格外小心。今天还发现代码中一些地方滥用synchronized关键字，导致系统性能受到很大的影响，处理不当跟前面提到问题一起出现，那系统就是时候over了。 
+另外，如果不是自己来处理事务，可能在用hibernate或者ejb等，都一定要记住在处理完之后要提交或者回滚哦。
