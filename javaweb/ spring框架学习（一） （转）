@@ -1,0 +1,92 @@
+1，什么是spring框架
+
+spring是J2EE应用程序框架，是轻量级的IoC和AOP的容器框架，主要是针对javaBean的生命周期进行管理的轻量级容器，可以单独使用，也可以和Struts框架，ibatis框架等组合使用。
+
+ 
+
+ 
+
+2，架构概述
+ 
+ 
+
+  1）IoC(Inversion of Control)控制反转，对象创建责任的反转，在spring中BeanFacotory是IoC容器的核心接口，负责实例化，定位，配置应用程序中的对象及建立这些对象间的依赖。XmlBeanFacotory实现BeanFactory接口，通过获取xml配置文件数据，组成应用对象及对象间的依赖关系。
+
+spring中有三种注入方式，一种是set注入，一种是接口注入，另一种是构造方法注入。
+
+ 
+
+    2）AOP面向切面编程
+
+   aop就是纵向的编程，如下图所示，业务1和业务2都需要一个共同的操作，与其往每个业务中都添加同样的代码，不如写一遍代码，让两个业务共同使用这段代码。
+
+ spring中面向切面变成的实现有两种方式，一种是动态代理，一种是CGLIB，动态代理必须要提供接口，而CGLIB实现是有继承。
+
+ 
+
+3，为什么使用spring框架
+
+  在不使用spring框架之前，我们的service层中要使用dao层的对象，不得不在service层中new一个对象。如下：
+[java] view plain copy print?在CODE上查看代码片派生到我的代码片
+
+    //dao层对象  
+    public class UserDao{  
+       publicvoid insert(User user){}  
+    }  
+       
+    //service层对象  
+    public classUserService{  
+       publicvoid insert(User user){  
+           UserDaouserdao = new UserDao();  
+           userdao.insert(user);  
+       }  
+    }  
+
+
+
+存在的问题：层与层之间的依赖。
+
+使用框架后：
+
+
+[java] view plain copy print?在CODE上查看代码片派生到我的代码片
+
+    //dao层对象  
+    public class UserDao{  
+        publicvoid insert(User user){}  
+    }  
+       
+    //service层对象  
+    public classUserService{  
+       privateUserDao userdao;  
+       
+       publicUserDao getUserdao() {  
+          returnuserdao;  
+       }  
+       publicvoid setUserdao(UserDao userdao) {  
+          this.userdao= userdao;  
+       }  
+       
+       publicvoid insert(User user){  
+          userdao.insert(user);  
+       }  
+       
+    }  
+
+
+service层要用dao层对象需要配置到xml配置文件中，至于对象是怎么创建的，关系是怎么组合的都交给了spring框架去实现。
+
+
+4，框架优点
+
+    轻量级的容器框架没有侵入性
+
+    使用IoC容器更加容易组合对象直接间关系，面向接口编程，降低耦合
+
+    Aop可以更加容易的进行功能扩展，遵循ocp开发原则
+
+    创建对象默认是单例的，不需要再使用单例模式进行处理
+
+ 
+
+5，缺点：业务功能依赖spring特有的功能，依赖与spring环境。
