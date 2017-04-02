@@ -1,0 +1,26 @@
+﻿
+A Configuration error occurred during startup.Please verify the preference field with the prompt：
+
+ 
+
+ 
+
+原因多种：
+
+1.我出现错误原因，是因为myeclipse的jdk版本的Tomcat不一致
+
+2.很关键一点，JRE Name里面导入的文件夹必须是JDK安装根目录，不能是里面的JRE，如果重名了，修改一下名字即可，我本来就是jdk1.7，因为重名，修改成了jdk1.7.01
+
+3.
+
+Eclipse菜单，Window->Preference…，打开Preference对话框，找到菜单树中MyEclipse-> Application Servers->Tomcat 5。选中Tomcat 5项，在对话框中，选中Enable单选按钮，然后点击Tomcat Home Directory 输入框后的Browse按钮，选择Tomcat的安装根目录，这里是D:Tomcat5.5，其它的框会自动填充。点击Apply按钮。
+
+选中Tomcat 5中的JDK一项，这里要特别注意，默认的是JRE的运行环境，这里要设定成JDK的，否则，MyEclipse无法正常部属Web应用，也无法正常运行Tomcat服务器。
+
+我们点击Add按钮，JRE Name中写入JDK1.5.0_06，然后在Browse选择框中选择JDK的根目录，这里是C:Program FilesJavajdk1.5.0_06，其他的默认，点击OK按钮。在Tomcat JDK Name中选择我们刚才创建的那个，就是JDK1.5.0_06。点击Apply按钮，每次都点吧，有时候Eclipse出问题，你不点这个跑到另一个配 置页面就会丢失上面的配置。
+
+我们在Tomcat 5的Launch中确保选中了Debug模式。
+
+而Paths中就是一些类路径设置，第一个是提前加载的类路径，有些包一启动服务器初始化Web Application时就要用到，就是这些了；第二个是运行时才用到的；第三个是没有打包的类，这里我们就不管了。
+
+现在可以点击preference对话框的OK按钮了，完成Tomcat的配置。
